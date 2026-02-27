@@ -3,6 +3,13 @@
 <head>
 <meta charset="UTF-8">
 <title>Jogo da Memória</title>
+
+<!-- PWA -->
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#ff6b6b">
+<link rel="apple-touch-icon" href="icon-512.png">
+<link rel="icon" href="icon-192.png">
+
 <style>
   body {
     font-family: 'Arial', sans-serif;
@@ -116,7 +123,6 @@ const images = [
   'images/foto10.jpg', 'images/foto11.jpg', 'images/foto12.jpg'
 ];
 
-// Sons
 const soundMatch = new Audio('sounds/acerto.mp3');
 const soundFail = new Audio('sounds/erro.mp3');
 const soundWin = new Audio('sounds/parabens.mp3');
@@ -143,7 +149,6 @@ function startGame() {
     const card = document.createElement('div');
     card.classList.add('card');
     card.dataset.image = src;
-    card.dataset.index = index;
 
     const inner = document.createElement('div');
     inner.classList.add('card-inner');
@@ -192,12 +197,10 @@ function checkMatch() {
     soundFail.play();
     if (players.length === 2) {
       currentPlayer = currentPlayer === 1 ? 2 : 1;
+      document.getElementById('currentPlayer').textContent = `Vez de: ${players[currentPlayer-1]}`;
     }
   }
   flipped = [];
-  if (players.length === 2) {
-    document.getElementById('currentPlayer').textContent = `Vez de: ${players[currentPlayer-1]}`;
-  }
 }
 
 function shuffle(array) {
@@ -205,8 +208,11 @@ function shuffle(array) {
     const j = Math.floor(Math.random() * (i + 1));
     [array[i], array[j]] = [array[j], array[i]];
   }
-}  
+}
 </script>
+
+<!-- Registrar Service Worker -->
+<script src="pwa.js"></script>
+
 </body>
 </html>
-
