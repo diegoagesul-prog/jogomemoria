@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>Jogo da Memória</title>
+<style>
+  body { font-family: Arial, sans-serif; text-align: center; margin: 20px; }
+  #game { display: grid; grid-template-columns: repeat(6, 100px); gap: 10px; justify-content: center; margin-top: 20px; }
+  .card { width: 100px; height: 100px; background-color: #ccc; display: flex; justify-content: center; align-items: center; cursor: pointer; font-size: 0; transition: transform 0.3s; }
+  .card img { width: 100%; height: 100%; display: none; }
+  .card.flipped img { display: block; }
+  .card.matched { background-color: #8f8; cursor: default; }
+  #currentPlayer { margin-top: 20px; font-size: 18px; font-weight: bold; }
+</style>
+</head>
+<body>
+<h1>Jogo da Memória</h1>
+<div>
+  <label>Nome do Jogador 1: <input type="text" id="player1"></label><br><br>
+  <label>Nome do Jogador 2 (opcional): <input type="text" id="player2"></label><br><br>
+  <button onclick="startGame()">Começar Jogo</button>
+</div>
+<div id="currentPlayer"></div>
+<div id="game"></div>
+<script>
+let cards = [];
+let flipped = [];
+let matchedCount = 0;
+let currentPlayer = 1;
+let players = [];
+
+const images = [
+  'images/foto1.jpg', 'images/foto2.jpg', 'images/foto3.jpg',
+  'images/foto4.jpg', 'images/foto5.jpg', 'images/foto6.jpg',
+  'images/foto7.jpg', 'images/foto8.jpg', 'images/foto9.jpg',
+  'images/foto10.jpg', 'images/foto11.jpg', 'images/foto12.jpg'
+];
+
+// Sons
+const soundMatch = new Audio('sounds/acerto.mp3');
+const soundFail = new Audio('sounds/erro.mp3');
+const soundWin = new Audio('sounds/parabens.mp3');
+
+function startGame() {
+  const p1 = document.getElementById('player1').value.trim();
+  const p2 = document.getElementById('player2').value.trim();
+  if (!p1) { alert('Digite o nome do jogador 1'); return; }
+  players = [p1];
+  if (p2) players.push(p2);
+  currentPlayer = 1;
+
+  matchedCount = 0;
+  flipped = [];
+  document.getElementById('currentPlayer').textContent = `Vez de: ${players[currentPlayer-1]}`;
+
+  cards = images.concat(images);
+  shuffle(cards);
+
+  const gameDiv = document.getElementById('game');
+  gameDiv.innerHTML = '';
+
+  cards.forEach((src, index) => {
+    const card = document.createElement('div');
+    card.classList.add('card');
+    card.dataset.image = src;
+    card.dataset.index = index;
+    const img = document.createElement('img');
+    img.src = src;
+    card.appendChild(img);
+    card.addEventListener('click', flipCard);
+    gameDiv.appendChild(card);
+  });
+}
+
+function flipCard() {
+  if (this.classList.contains('flipped') || this.classList.contains('matched')) return;
+  this.classList.add('flipped');
+  flipped.push(this);
+
+  if (flipped.length === 2) {
+    setTimeout(checkMatch, 500);
+  }
+}
+
+function checkMatch() {
+  const [card1, card2] = flipped;
+  if (card1.dataset.image === card2.dataset.image) {
+    card1.classList.add('matched');
+    card2.classList.add('matched');
+    matchedCount += 2;
+    soundMatch.play();
+    if (matchedCount === cards.length) {
+      soundWin.play();
+      alert(`Parabéns ${players.join(' e ')}! Vocês terminaram o jogo!`);
+    }
+  } else {
+    card1.classList.remove('flipped');
+    card2.classList.remove('flipped');
+    soundFail.play();
+    if (players.length === 2) {
+      currentPlayer = currentPlayer === 1 ? 2 : 1;
+    }
+  }
+  flipped = [];
+  if (players.length === 2) {
+    document.getElementById('currentPlayer').textContent = `Vez de: ${players[currentPlayer-1]}`;
+  }
+}
+
+function shuffle(array) {
+  for (let i = array.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [array[i], array[j]] = [array[j], array[i]];
+  }
+}  
+</script>
+</body>
+</html>
