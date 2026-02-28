@@ -17,18 +17,38 @@
     margin: 0;
     padding: 0;
     background: linear-gradient(to right, #ffd6a5, #fdffb6);
+    overflow-x: hidden;
   }
   h1 {
     margin-top: 20px;
     color: #ff6b6b;
     text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
   }
+  .controls {
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+    align-items: center;
+    flex-wrap: wrap;
+    margin-top: 10px;
+  }
+  #status {
+    margin-top: 14px;
+    font-size: 18px;
+    font-weight: bold;
+    color: #fff;
+    background-color: #ff6b6b;
+    display: inline-block;
+    padding: 10px 16px;
+    border-radius: 12px;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+  }
   #game {
     display: grid;
     grid-template-columns: repeat(6, 100px);
     gap: 10px;
     justify-content: center;
-    margin-top: 20px;
+    margin-top: 18px;
     padding-bottom: 40px;
   }
   .card {
@@ -59,7 +79,7 @@
     overflow: hidden;
   }
   .card-front {
-    background-color: #ccc;
+    background: radial-gradient(circle at 30% 30%, #ffffff, #d9d9d9);
   }
   .card-back {
     transform: rotateY(180deg);
@@ -69,52 +89,59 @@
     width: 90%;
     height: 90%;
     object-fit: cover;
-    border-radius: 8px;
+    border-radius: 10px;
   }
   .card.matched .card-back {
     background-color: #8f8;
     box-shadow: 0 0 10px #4caf50;
   }
-  #currentPlayer {
-    font-size: 20px;
-    font-weight: bold;
-    color: #fff;
-    background-color: #ff6b6b;
-    display: inline-block;
-    padding: 10px 20px;
-    border-radius: 12px;
-    box-shadow: 0 4px 6px rgba(0,0,0,0.3);
-    margin-bottom: 20px;
-  }
-  input, button {
-    padding: 5px 10px;
+  button {
+    padding: 10px 14px;
     font-size: 16px;
-    border-radius: 8px;
+    border-radius: 10px;
     border: none;
     box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    background: #ffffff;
   }
   button:hover {
     background-color: #ff6b6b;
     color: #fff;
     cursor: pointer;
   }
+  button:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+
+  /* Confete (canvas por cima de tudo) */
+  #confetti {
+    position: fixed;
+    inset: 0;
+    width: 100vw;
+    height: 100vh;
+    pointer-events: none;
+    z-index: 9999;
+    display: none;
+  }
 </style>
 </head>
 <body>
 <h1>Jogo da Memória</h1>
-<div>
-  <label>Nome do Jogador 1: <input type="text" id="player1"></label><br><br>
-  <label>Nome do Jogador 2 (opcional): <input type="text" id="player2"></label><br><br>
-  <button onclick="startGame()">Começar Jogo</button>
+
+<div class="controls">
+  <button id="btnStart" onclick="startGame()">Começar</button>
+  <button id="btnRestart" onclick="restartGame()" disabled>Reiniciar</button>
 </div>
-<div id="currentPlayer"></div>
+
+<div id="status">Clique em “Começar”</div>
 <div id="game"></div>
+<canvas id="confetti"></canvas>
+
 <script>
-let cards = [];
+let deck = [];
 let flipped = [];
 let matchedCount = 0;
-let currentPlayer = 1;
-let players = [];
+let isLocked = true;
 
 const images = [
   'images/foto1.jpg', 'images/foto2.jpg', 'images/foto3.jpg',
@@ -123,29 +150,20 @@ const images = [
   'images/foto10.jpg', 'images/foto11.jpg', 'images/foto12.jpg'
 ];
 
+// Sons
 const soundMatch = new Audio('sounds/acerto.mp3');
-const soundFail = new Audio('sounds/erro.mp3');
-const soundWin = new Audio('sounds/parabens.mp3');
+const soundFail  = new Audio('sounds/erro.mp3');
+const soundWin   = new Audio('sounds/parabens.mp3');
 
-function startGame() {
-  const p1 = document.getElementById('player1').value.trim();
-  const p2 = document.getElementById('player2').value.trim();
-  if (!p1) { alert('Digite o nome do jogador 1'); return; }
-  players = [p1];
-  if (p2) players.push(p2);
-  currentPlayer = 1;
+function setStatus(text) {
+  document.getElementById('status').textContent = text;
+}
 
-  matchedCount = 0;
-  flipped = [];
-  document.getElementById('currentPlayer').textContent = `Vez de: ${players[currentPlayer-1]}`;
-
-  cards = images.concat(images);
-  shuffle(cards);
-
+function buildBoard() {
   const gameDiv = document.getElementById('game');
   gameDiv.innerHTML = '';
 
-  cards.forEach((src, index) => {
+  deck.forEach((src) => {
     const card = document.createElement('div');
     card.classList.add('card');
     card.dataset.image = src;
@@ -158,6 +176,7 @@ function startGame() {
 
     const back = document.createElement('div');
     back.classList.add('card-back');
+
     const img = document.createElement('img');
     img.src = src;
     back.appendChild(img);
@@ -165,48 +184,173 @@ function startGame() {
     inner.appendChild(front);
     inner.appendChild(back);
     card.appendChild(inner);
-    card.addEventListener('click', flipCard);
+
+    card.addEventListener('click', () => flipCard(card));
     gameDiv.appendChild(card);
   });
 }
 
-function flipCard() {
-  if (this.classList.contains('flipped') || this.classList.contains('matched')) return;
-  this.classList.add('flipped');
-  flipped.push(this);
+function startGame() {
+  stopConfetti();
+  matchedCount = 0;
+  flipped = [];
+  isLocked = false;
+
+  deck = images.concat(images);
+  shuffle(deck);
+  buildBoard();
+
+  document.getElementById('btnStart').disabled = true;
+  document.getElementById('btnRestart').disabled = false;
+  setStatus('Encontre todos os pares!');
+}
+
+function restartGame() {
+  startGame();
+}
+
+function flipCard(card) {
+  if (isLocked) return;
+  if (card.classList.contains('flipped') || card.classList.contains('matched')) return;
+
+  card.classList.add('flipped');
+  flipped.push(card);
 
   if (flipped.length === 2) {
-    setTimeout(checkMatch, 500);
+    isLocked = true;
+    setTimeout(checkMatch, 550);
   }
 }
 
 function checkMatch() {
   const [card1, card2] = flipped;
+
   if (card1.dataset.image === card2.dataset.image) {
     card1.classList.add('matched');
     card2.classList.add('matched');
     matchedCount += 2;
     soundMatch.play();
-    if (matchedCount === cards.length) {
+
+    if (matchedCount === deck.length) {
       soundWin.play();
-      alert(`Parabéns ${players.join(' e ')}! Vocês terminaram o jogo!`);
+      setStatus('🎉 Parabéns! Você terminou o jogo!');
+      startConfetti(2200);
+      isLocked = true;
+      flipped = [];
+      return;
     }
+
+    setStatus('Boa! Continue!');
   } else {
     card1.classList.remove('flipped');
     card2.classList.remove('flipped');
     soundFail.play();
-    if (players.length === 2) {
-      currentPlayer = currentPlayer === 1 ? 2 : 1;
-      document.getElementById('currentPlayer').textContent = `Vez de: ${players[currentPlayer-1]}`;
-    }
+    setStatus('Tente de novo!');
   }
+
   flipped = [];
+  isLocked = false;
 }
 
 function shuffle(array) {
   for (let i = array.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
     [array[i], array[j]] = [array[j], array[i]];
+  }
+}
+
+/* ==========================
+   Confete (sem biblioteca)
+   ========================== */
+const confettiCanvas = document.getElementById('confetti');
+const ctx = confettiCanvas.getContext('2d');
+let confettiPieces = [];
+let confettiAnim = null;
+let confettiStopAt = 0;
+
+function resizeConfetti() {
+  const dpr = window.devicePixelRatio || 1;
+  confettiCanvas.width = Math.floor(window.innerWidth * dpr);
+  confettiCanvas.height = Math.floor(window.innerHeight * dpr);
+  confettiCanvas.style.width = window.innerWidth + 'px';
+  confettiCanvas.style.height = window.innerHeight + 'px';
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
+window.addEventListener('resize', resizeConfetti);
+resizeConfetti();
+
+function rand(min, max) { return Math.random() * (max - min) + min; }
+
+function makePiece() {
+  const w = rand(6, 12);
+  const h = rand(8, 16);
+  return {
+    x: rand(0, window.innerWidth),
+    y: rand(-window.innerHeight, 0),
+    w,
+    h,
+    vx: rand(-1.2, 1.2),
+    vy: rand(2.2, 4.6),
+    rot: rand(0, Math.PI * 2),
+    vr: rand(-0.2, 0.2),
+    // sem escolher cor manualmente? aqui é só aleatório (OK)
+    color: `hsl(${Math.floor(rand(0, 360))} 85% 60%)`,
+    alpha: rand(0.85, 1)
+  };
+}
+
+function startConfetti(durationMs = 2000) {
+  resizeConfetti();
+  confettiCanvas.style.display = 'block';
+
+  confettiPieces = Array.from({ length: 140 }, makePiece);
+  confettiStopAt = performance.now() + durationMs;
+
+  if (confettiAnim) cancelAnimationFrame(confettiAnim);
+  tickConfetti();
+}
+
+function stopConfetti() {
+  if (confettiAnim) cancelAnimationFrame(confettiAnim);
+  confettiAnim = null;
+  confettiPieces = [];
+  ctx.clearRect(0, 0, window.innerWidth, window.innerHeight);
+  confettiCanvas.style.display = 'none';
+}
+
+function tickConfetti() {
+  const now = performance.now();
+  ctx.clearRect(0, 0, window.innerWidth, window.innerHeight);
+
+  for (const p of confettiPieces) {
+    p.x += p.vx;
+    p.y += p.vy;
+    p.rot += p.vr;
+
+    // leve "vento"
+    p.vx += rand(-0.03, 0.03);
+    p.vx = Math.max(-2, Math.min(2, p.vx));
+
+    // reaparece se saiu
+    if (p.y > window.innerHeight + 30) {
+      p.y = rand(-120, -20);
+      p.x = rand(0, window.innerWidth);
+      p.vy = rand(2.2, 4.8);
+    }
+
+    ctx.save();
+    ctx.globalAlpha = p.alpha;
+    ctx.translate(p.x, p.y);
+    ctx.rotate(p.rot);
+    ctx.fillStyle = p.color;
+    ctx.fillRect(-p.w / 2, -p.h / 2, p.w, p.h);
+    ctx.restore();
+  }
+
+  if (now < confettiStopAt) {
+    confettiAnim = requestAnimationFrame(tickConfetti);
+  } else {
+    stopConfetti();
   }
 }
 </script>
@@ -216,3 +360,4 @@ function shuffle(array) {
 
 </body>
 </html>
+
